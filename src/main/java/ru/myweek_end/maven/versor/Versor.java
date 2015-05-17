@@ -158,6 +158,16 @@ public class Versor extends AbstractMojo {
     executeMojo(buildnumberPlugin, goal("extract-buildnumber"), cfg, pluginEnv);
   }
 
+  private boolean isRelease(String tags, String version) {
+    String[] tagArray = tags.split(";");
+    for (String tag : tagArray) {
+      if (tag.equals("v" + version)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Запись версии в pom файл.
    * 
@@ -168,8 +178,15 @@ public class Versor extends AbstractMojo {
   private void set() throws MojoExecutionException {
     Plugin versionsPlugin = plugin("org.codehaus.mojo",
         "versions-maven-plugin", "2.2");
-    final Xpp3Dom cfg = configuration(element(name("newVersion"),
-        "${product.version}.${git.commitsCount}"));
+    String productVersion = project.getProperties().getProperty("product.version");
+    String commitsCount = project.getProperties().getProperty("git.commitsCount");
+    String version = productVersion + "." + commitsCount;
+    String tags = project.getProperties().getProperty("git.tag");
+    if (!isRelease(tags, version)) {
+      version = version + "-SNAPSHOT";
+    }
+    getLog().info("version =\"" + version + "\"");
+    final Xpp3Dom cfg = configuration(element(name("newVersion"), version));
     if (versionsPlugin != null && cfg != null) {
       executeMojo(versionsPlugin, goal("set"), cfg, pluginEnv);
     }

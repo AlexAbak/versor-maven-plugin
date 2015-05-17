@@ -45,18 +45,20 @@ import static org.junit.Assert.assertEquals;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import org.codehaus.plexus.util.IOUtil;
@@ -65,7 +67,7 @@ import org.junit.Test;
 
 /**
  * Интеграционный тест обновления версии pom.
- * 
+ *
  * @author <a href="https://myweek-end.ru/">Моя неделя завершилась</a>
  * @author <a href="mailto:drum@pisem.net">Алексей Кляузер</a>
  * @since 0.0.1.2
@@ -75,7 +77,7 @@ public class VersorIntegration {
 
   /**
    * Чтение pom файла.
-   * 
+   *
    * @since 0.0.1.2
    * @param source
    *          Файл для чтения
@@ -83,56 +85,22 @@ public class VersorIntegration {
    * @throws JAXBException
    *           при проблемах десериализации
    */
-  private Pom readPom(File source) throws JAXBException {
+  private final Pom readPom(final File source) throws JAXBException {
     JAXBContext jaxbContext = JAXBContext.newInstance(Pom.class);
     Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
     return (Pom) unmarshaller.unmarshal(source);
   }
 
   /**
-   * Размер буфера для чтения потока.
-   * 
-   * @since 0.0.1.2
-   */
-  private static final int BUFFER_SIZE = 2048;
-
-  /**
-   * Признак завершения потока.
-   * 
-   * @since 0.0.1.2
-   */
-  private static final int EOF_MARK = -1;
-
-  /**
-   * Копирование входного потока в выходной..
-   * 
-   * @since 0.0.1.2
-   * @param source
-   *          Входной поток
-   * @param dest
-   *          Выходной поток
-   * @throws IOException
-   *           при проблемах с потоками
-   */
-  private void copyInputToOutput(InputStream source, OutputStream dest)
-      throws IOException {
-    byte[] buffer = new byte[BUFFER_SIZE];
-    int bytesRead = EOF_MARK;
-    while ((bytesRead = source.read(buffer)) != EOF_MARK) {
-      dest.write(buffer, 0, bytesRead);
-    }
-  }
-
-  /**
    * Запуск процесса и генерация исключения в случае появления ошибок.
-   * 
+   *
    * @since 0.0.1.2
    * @param processBuilder
    *          Заполненные свойства создаваемого процесса
    * @throws Exception
    *           в случае наличия ошибок
    */
-  private void throwProcess(ProcessBuilder processBuilder) throws Exception {
+  private final void throwProcess(final ProcessBuilder processBuilder) throws Exception {
     System.out.println(processBuilder.command().toString());
     processBuilder.redirectErrorStream(true);
     Process process = processBuilder.start();
@@ -163,77 +131,50 @@ public class VersorIntegration {
   }
 
   /**
-   * Подготовка репозитория maven и распаковка репозитория git.
-   * 
-   * @since 0.0.1.2
+   * Очистка каталога.
+   *
+   * @since 0.0.1.3
    * @throws Exception
-   *           при проблемах подготовки
+   *           при проблемах очистки
    */
-  @Before
-  public void setUp() throws Exception {
-
-    Path project = new File("./").getCanonicalFile().toPath();
-    File pomFile = project.resolve("pom.xml").toFile();
-    Path target = project.resolve("target");
-    File rep = target.resolve("rep").toFile();
-
-    rep.mkdirs();
-    Pom pom = readPom(pomFile);
-
-    String version = pom.version;
-
-    String mvn;
-    if (System.getProperty("os.name").toLowerCase().startsWith("win")) {
-      mvn = "mvn.bat";
-    } else {
-      mvn = "mvn";
+  public final void erase(final File dir) {
+    if (dir.exists() && dir.isDirectory()) {
+      for (File item : dir.listFiles()) {
+        if (item.isDirectory()) {
+          erase(item);
+        }
+        item.delete();
+      }
     }
+  }
 
-    ProcessBuilder processBuilder;
-
-    processBuilder = new ProcessBuilder(mvn, "install:install-file",
-        "-DpomFile=" + pomFile.toString(), "-Dfile="
-            + target.resolve("versor-maven-plugin-" + version + ".jar")
-                .toString(), "-Dsources="
-            + target.resolve("versor-maven-plugin-" + version + "-sources.jar")
-                .toString(), "-Djavadoc="
-            + target.resolve("versor-maven-plugin-" + version + "-javadoc.jar")
-                .toString(), "-DgroupId=ru.myweek-end.maven",
-        "-DartifactId=versor-maven-plugin", "-Dversion=" + version,
-        "-Dpackaging=jar", "-DlocalRepositoryPath=" + rep.toString(),
-        "-DcreateChecksum=true");
-    this.throwProcess(processBuilder);
-
-    Path resources = project.resolve("src/integration/resources");
-    ZipFile zipFile = new ZipFile(resources.resolve("testrep.zip").toFile());
+  /**
+   * Распаковка zip архива.
+   *
+   * @since 0.0.1.3
+   * @param sourceFile
+   *          Исходный zip файл
+   * @param destDir
+   *          каталог назначения
+   * @throws ZipException
+   *           при проблемах с архивом
+   * @throws IOException
+   *           при проблемах с файловой системой
+   */
+  private final void UnZip(final File sourceFile, final Path destDir) throws ZipException,
+      IOException {
+    ZipFile zipFile = new ZipFile(sourceFile);
     try {
-      for (Enumeration<? extends ZipEntry> entries = zipFile.entries(); entries
-          .hasMoreElements();) {
+      for (Enumeration<? extends ZipEntry> entries = zipFile.entries(); entries.hasMoreElements();) {
         ZipEntry entry = entries.nextElement();
-        File file = target.resolve(entry.getName()).toFile();
+        File file = destDir.resolve(entry.getName()).toFile();
         if (entry.isDirectory()) {
           file.mkdirs();
         } else {
           InputStream source = zipFile.getInputStream(entry);
           FileOutputStream output = new FileOutputStream(file);
-          if ("testrep/pom.xml".equals(entry.getName())) {
-
-            String repReg = rep.toString();
-            repReg = repReg.replaceAll(":\\\\", "/");
-            repReg = repReg.replaceAll("\\\\", "/");
-            System.out.println(repReg);
-
-            String pomContent = IOUtil.toString(source, "UTF-8");
-            pomContent = pomContent.replaceAll("#repository", repReg);
-            pomContent = pomContent.replaceAll("#version", version);
-            InputStream stream = new ByteArrayInputStream(
-                pomContent.getBytes("UTF-8"));
-            copyInputToOutput(stream, output);
-          } else {
-            copyInputToOutput(source, output);
-          }
+          IOUtil.copy(source, output);
         }
-        System.out.println(entry.getName());
       }
     } finally {
       zipFile.close();
@@ -241,20 +182,90 @@ public class VersorIntegration {
   }
 
   /**
-   * Запуск теста установки версии.
-   * 
+   * Подготовка репозитория maven.
+   *
+   * @since 0.0.1.3
+   * @throws JAXBException
+   *           при проблемах сохранения настроек
+   * @throws IOException
+   *           при проблемах с файловой системой
+   * @throws ZipException
+   *           при проблемах с архивом
+   */
+  private final File setUpMaven(final Path resources, final Path target) throws JAXBException,
+      ZipException, IOException {
+    Path m2 = target.resolve(".m2");
+    erase(m2.toFile());
+    UnZip(resources.resolve("m2.zip").toFile(), target);
+    Path repository = m2.resolve("repository");
+    repository.toFile().mkdirs();
+    MavenSettings mavenSettings = new MavenSettings();
+    mavenSettings.localRepository = repository.toString();
+
+    JAXBContext jaxbContext = JAXBContext.newInstance(MavenSettings.class);
+    Marshaller marshaller = jaxbContext.createMarshaller();
+    marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+    marshaller.setProperty(Marshaller.JAXB_SCHEMA_LOCATION, MavenSettings.nsLocation);
+    File settingsXml = m2.resolve("settings.xml").toFile();
+    marshaller.marshal(mavenSettings, settingsXml);
+
+    return settingsXml;
+  }
+
+  /**
+   * Путь к проекту.
+   *
+   * @since 0.0.1.3
+   */
+  private Path project;
+
+  /**
+   * Путь к ресурсам.
+   *
+   * @since 0.0.1.3
+   */
+  private Path resources;
+
+  /**
+   * Путь к папке сборки.
+   *
+   * @since 0.0.1.3
+   */
+  private Path target;
+
+  /**
+   * Настройки локального maven.
+   *
+   * @since 0.0.1.3
+   */
+  private File settingsXml;
+
+  /**
+   * Имя исполнимого файла maven.
+   *
+   * @since 0.0.1.3
+   */
+  private String mvn;
+
+  /**
+   * Подготовка репозитория maven и распаковка репозитория git.
+   *
    * @since 0.0.1.2
    * @throws Exception
-   *           при проблемах вызова maven
+   *           при проблемах подготовки
    */
-  @Test
-  public void test() throws Exception {
-    Path project = new File("./").getCanonicalFile().toPath();
-    Path target = project.resolve("target");
-    Path testrep = target.resolve("testrep");
-    File pomFile = testrep.resolve("pom.xml").toFile();
+  @Before
+  public void setUp() throws Exception {
 
-    String mvn;
+    project = new File("./").getCanonicalFile().toPath();
+    resources = project.resolve("src/integration/resources");
+    target = project.resolve("target");
+    settingsXml = setUpMaven(resources, target);
+
+    File pomFile = project.resolve("pom.xml").toFile();
+    Pom pom = readPom(pomFile);
+    String version = pom.version;
+
     if (System.getProperty("os.name").toLowerCase().startsWith("win")) {
       mvn = "mvn.bat";
     } else {
@@ -262,13 +273,68 @@ public class VersorIntegration {
     }
 
     ProcessBuilder processBuilder;
-    processBuilder = new ProcessBuilder(mvn, "-f", pomFile.toString(),
-        "versor:set");
+
+    processBuilder = new ProcessBuilder(
+        mvn,
+        "install:install-file",
+        "-s",
+        settingsXml.toString(),
+        "-DpomFile=" + pomFile.toString(),
+        "-Dfile=" + target.resolve("versor-maven-plugin-" + version + ".jar").toString(),
+        "-Dsources=" + target.resolve("versor-maven-plugin-" + version + "-sources.jar").toString(),
+        "-Djavadoc=" + target.resolve("versor-maven-plugin-" + version + "-javadoc.jar").toString(),
+        "-DgroupId=ru.myweek-end.maven", "-DartifactId=versor-maven-plugin",
+        "-Dversion=" + version, "-Dpackaging=jar", "-DcreateChecksum=true");
+    this.throwProcess(processBuilder);
+
+    erase(target.resolve("testrep").toFile());
+    UnZip(resources.resolve("testrep.zip").toFile(), target);
+
+    File testRepPom0 = target.resolve("testrep/pom.xml").toFile();
+    File testRepPom1 = target.resolve("testrep/pom1.xml").toFile();
+    testRepPom0.renameTo(testRepPom1);
+    InputStream source = new FileInputStream(testRepPom1);
+    String pomContent = IOUtil.toString(source, "UTF-8");
+    pomContent = pomContent.replaceAll("#version", version);
+    InputStream stream = new ByteArrayInputStream(pomContent.getBytes("UTF-8"));
+    FileOutputStream output = new FileOutputStream(testRepPom0);
+    IOUtil.copy(stream, output);
+    testRepPom1.delete();
+  }
+
+  /**
+   * Запуск теста установки версии.
+   *
+   * @since 0.0.1.2
+   * @throws Exception
+   *           при проблемах вызова maven
+   */
+  @Test
+  public void test() throws Exception {
+    Path testrep = target.resolve("testrep");
+    File pomFile = testrep.resolve("pom.xml").toFile();
+
+    ProcessBuilder processBuilder;
+    processBuilder = new ProcessBuilder(mvn, "-s", settingsXml.toString(), "-f",
+        pomFile.toString(), "versor:set");
     processBuilder = processBuilder.directory(testrep.toFile());
     this.throwProcess(processBuilder);
 
     Pom pom = readPom(pomFile);
+    assertEquals("x.y.1-SNAPSHOT", pom.version);
+
+    processBuilder = new ProcessBuilder("git", "tag", "-a", "vx.y.1", "-m", "'release'");
+    processBuilder = processBuilder.directory(testrep.toFile());
+    this.throwProcess(processBuilder);
+
+    processBuilder = new ProcessBuilder(mvn, "-s", settingsXml.toString(), "-f",
+        pomFile.toString(), "versor:set");
+    processBuilder = processBuilder.directory(testrep.toFile());
+    this.throwProcess(processBuilder);
+
+    pom = readPom(pomFile);
     assertEquals("x.y.1", pom.version);
+
   }
 
 }
