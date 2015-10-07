@@ -48,6 +48,8 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.name;
 import static org.twdata.maven.mojoexecutor.MojoExecutor.plugin;
 
 import java.io.File;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Plugin;
@@ -68,7 +70,7 @@ import org.twdata.maven.mojoexecutor.MojoExecutor.ExecutionEnvironment;
  * @author <a href="https://myweek-end.ru/">Моя неделя завершилась</a>
  * @author <a href="mailto:drum@pisem.net">Алексей Кляузер</a>
  * @since 0.0.1.2
- * @version 0.0.1.2
+ * @version 0.0.1.5
  */
 @Mojo(name = "set")
 public class Versor extends AbstractMojo {
@@ -129,6 +131,30 @@ public class Versor extends AbstractMojo {
   private MojoExecutor.ExecutionEnvironment pluginEnv;
 
   /**
+   * Версия продукта.
+   * 
+   * @since 0.0.1.5
+   */
+  @Parameter(property = "product.version")
+  private String productVersion;
+
+  /**
+   * Стратегия определения версии продукта.
+   * 
+   * @since 0.0.1.5
+   */
+  @Parameter(property = "versor.strategy", defaultValue = "STRICT_TAG")
+  private VersorStrategy strategy;
+
+  /**
+   * Паттерн главной версии продукта.
+   * 
+   * @since 0.0.1.5
+   */
+  @Parameter(property = "versor.main.pattern", required = true, defaultValue = "\\d+\\.\\d+\\.\\d+")
+  private String mainVersionPattern;
+
+  /**
    * Вызов цели.
    * 
    * @since 0.0.1.2
@@ -152,18 +178,26 @@ public class Versor extends AbstractMojo {
    *           При проблемах вызова плагина
    */
   private void buildnumber() throws MojoExecutionException {
-    Plugin buildnumberPlugin = plugin("ru.concerteza.buildnumber",
-        "maven-jgit-buildnumber-plugin", "1.2.10");
+    Plugin buildnumberPlugin = plugin("ru.concerteza.buildnumber", "maven-jgit-buildnumber-plugin",
+        "1.2.10");
     final Xpp3Dom cfg = configuration();
     executeMojo(buildnumberPlugin, goal("extract-buildnumber"), cfg, pluginEnv);
   }
 
   private boolean isRelease(String tags, String version) {
-    String[] tagArray = tags.split(";");
-    for (String tag : tagArray) {
-      if (tag.equals("v" + version)) {
-        return true;
+    switch (this.strategy) {
+    case PROD_BRANCH:
+      String branch = project.getProperties().getProperty("git.branch");
+      branch.contains("prod");
+      break;
+    case STRICT_TAG:
+      String[] tagArray = tags.split(";");
+      for (String tag : tagArray) {
+        if (tag.equals("v" + version)) {
+          return true;
+        }
       }
+      break;
     }
     return false;
   }
@@ -176,9 +210,8 @@ public class Versor extends AbstractMojo {
    *           При проблемах вызова плагина
    */
   private void set() throws MojoExecutionException {
-    Plugin versionsPlugin = plugin("org.codehaus.mojo",
-        "versions-maven-plugin", "2.2");
-    String productVersion = project.getProperties().getProperty("product.version");
+    Plugin versionsPlugin = plugin("org.codehaus.mojo", "versions-maven-plugin", "2.2");
+    String productVersion = buildVersion();
     String commitsCount = project.getProperties().getProperty("git.commitsCount");
     String version = productVersion + "." + commitsCount;
     String tags = project.getProperties().getProperty("git.tag");
@@ -190,6 +223,49 @@ public class Versor extends AbstractMojo {
     if (versionsPlugin != null && cfg != null) {
       executeMojo(versionsPlugin, goal("set"), cfg, pluginEnv);
     }
+  }
+
+  /**
+   * Вернуть строку с версией
+   * 
+   * @since 0.0.1.5
+   * @return Строка с версией
+   */
+  private String buildVersion() {
+    if (this.productVersion == null) {
+      Pattern pattern = getMainVersionPattern();
+      Matcher matcher;
+      switch (this.strategy) {
+      case PROD_BRANCH:
+        String branch = project.getProperties().getProperty("git.branch");
+        matcher = pattern.matcher(branch);
+        if (matcher.find()) {
+          this.productVersion = matcher.group();
+        } else {
+          this.productVersion = "0.0.0";
+        }
+        break;
+      case STRICT_TAG:
+        matcher = pattern.matcher(this.project.getVersion());
+        if (matcher.find()) {
+          this.productVersion = matcher.group();
+        } else {
+          this.productVersion = "0.0.0";
+        }
+        break;
+      }
+    }
+    return this.productVersion;
+  }
+
+  /**
+   * Вернуть паттерн главной версии продукта.
+   * 
+   * @since 0.0.1.5
+   * @return Паттерн.
+   */
+  private Pattern getMainVersionPattern() {
+    return Pattern.compile(this.mainVersionPattern);
   }
 
 }

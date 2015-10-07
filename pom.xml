@@ -1,43 +1,43 @@
 <?xml version='1.0' encoding='UTF-8'?>
 
 <!--
- Copyright © 2015 "Алексей Кляузер <drum@pisem.net>" Все права защищены.
+  Copyright © 2015 "Алексей Кляузер <drum@pisem.net>" Все права защищены.
 -->
 
 <!--
- This file is part of versor-maven-plugin.
+  This file is part of versor-maven-plugin.
 
- versor-maven-plugin is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+  versor-maven-plugin is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
- versor-maven-plugin is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+  versor-maven-plugin is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
 
- You should have received a copy of the GNU General Public License
- along with versor-maven-plugin.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with versor-maven-plugin. If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- 
- Этот файл — часть versor-maven-plugin.
+<!--
+  Этот файл — часть versor-maven-plugin.
 
- versor-maven-plugin - свободная программа: вы можете перераспространять ее и/или
- изменять ее на условиях Стандартной общественной лицензии GNU в том виде,
- в каком она была опубликована Фондом свободного программного обеспечения;
- либо версии 3 лицензии, либо (по вашему выбору) любой более поздней
- версии.
+  versor-maven-plugin - свободная программа: вы можете перераспространять ее и/или
+  изменять ее на условиях Стандартной общественной лицензии GNU в том виде,
+  в каком она была опубликована Фондом свободного программного обеспечения;
+  либо версии 3 лицензии, либо (по вашему выбору) любой более поздней
+  версии.
 
- versor-maven-plugin распространяется в надежде, что она будет полезной,
- но БЕЗО ВСЯКИХ ГАРАНТИЙ; даже без неявной гарантии ТОВАРНОГО ВИДА
- или ПРИГОДНОСТИ ДЛЯ ОПРЕДЕЛЕННЫХ ЦЕЛЕЙ. Подробнее см. в Стандартной
- общественной лицензии GNU.
+  versor-maven-plugin распространяется в надежде, что она будет полезной,
+  но БЕЗО ВСЯКИХ ГАРАНТИЙ; даже без неявной гарантии ТОВАРНОГО ВИДА
+  или ПРИГОДНОСТИ ДЛЯ ОПРЕДЕЛЕННЫХ ЦЕЛЕЙ. Подробнее см. в Стандартной
+  общественной лицензии GNU.
 
- Вы должны были получить копию Стандартной общественной лицензии GNU
- вместе с этой программой. Если это не так, см.
- <http://www.gnu.org/licenses/>.
+  Вы должны были получить копию Стандартной общественной лицензии GNU
+  вместе с этой программой. Если это не так, см.
+  <http://www.gnu.org/licenses/>.
 -->
 
 <project
@@ -277,28 +277,29 @@
 
     <plugins>
 
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>build-helper-maven-plugin</artifactId>
-          <executions>
-            <execution>
-              <id>add-integration-source</id>
-              <phase>generate-sources</phase>
-              <goals>
-                <goal>add-test-source</goal>
-              </goals>
-            </execution>
-          </executions>
-          <configuration>
-            <sources>
-              <source>src/integration/java</source>
-            </sources>
-          </configuration>
-        </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-integration-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <sources>
+            <source>src/integration/java</source>
+          </sources>
+        </configuration>
+      </plugin>
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-eclipse-plugin</artifactId>
+        <version>2.9</version>
         <configuration>
           <addGroupIdToProjectName>true</addGroupIdToProjectName>
           <additionalBuildcommands>
